@@ -29,6 +29,12 @@ The platform follows a modular pipeline architecture:
 
 ## 📦 Installation & Setup
 
+### ⚡ One-Click Start (Recommended)
+The easiest way to start the entire platform at once is to use the super script:
+1.  Navigate to the project root: `d:\cyberSec`.
+2.  Double-click **`run_atdh.bat`**.
+This will automatically open the Backend, Frontend, and prompt for elevation to start the Live Collector.
+
 ### 1. Database Configuration
 Ensure PostgreSQL is installed and running.
 1. Create a database named `threat_platform`.

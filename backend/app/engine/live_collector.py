@@ -23,9 +23,11 @@ class LiveCollector:
     def get_last_event_index(self, log_type):
         try:
             hand = win32evtlog.OpenEventLog(self.server, log_type)
+            # Oldest record number + total count = next record number to read
+            oldest = win32evtlog.GetOldestEventLogRecord(hand)
             count = win32evtlog.GetNumberOfEventLogRecords(hand)
-            # Start from the current end to avoid backlog flood
-            return count
+            # We start reading from the very last record to establish state
+            return oldest + count - 1
         except Exception as e:
             print(f"Error opening {log_type} log: {e}")
             return 0
@@ -33,14 +35,17 @@ class LiveCollector:
     def poll_windows_events(self, log_type, last_index):
         try:
             hand = win32evtlog.OpenEventLog(self.server, log_type)
-            flags = win32con.EVENTLOG_FORWARDS_READ | win32con.EVENTLOG_SEQUENTIAL_READ
+            # Use SEEK_READ to jump to the last index we processed
+            flags = win32con.EVENTLOG_FORWARDS_READ | win32con.EVENTLOG_SEEK_READ
             
-            # Read from the last index
             events = win32evtlog.ReadEventLog(hand, flags, last_index)
             new_last_index = last_index
             
             for event in events:
-                new_last_index += 1
+                # Use the actual record number from the event to track progress
+                if event.RecordNumber > new_last_index:
+                    new_last_index = event.RecordNumber
+                
                 msg = win32evtlogutil.SafeFormatMessage(event, log_type)
                 timestamp = event.TimeGenerated.Format()
                 
