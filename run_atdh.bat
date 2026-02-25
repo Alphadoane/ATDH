@@ -12,6 +12,10 @@ start "ATDH_Backend" cmd /c "cd /d "%~dp0backend" && python -m uvicorn app.main:
 echo [2/3] Starting Frontend Dashboard...
 start "ATDH_Frontend" cmd /c "cd /d "%~dp0frontend" && npm run dev"
 
+:: Wait for Backend to warm up
+echo [WAIT] Waiting 5 seconds for services to initialize...
+timeout /t 5 /nobreak >nul
+
 :: Start Collector (Elevated)
 echo [3/3] Requesting elevation for Live Collector...
 start "ATDH_Collector_Launcher" cmd /c "cd /d "%~dp0" && run_collector_admin.bat"
