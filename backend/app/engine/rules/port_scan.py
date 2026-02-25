@@ -1,0 +1,42 @@
+from typing import List
+from datetime import datetime, timedelta
+from .base_rule import DetectionRule
+from ...models import NormalizedLog, Alert
+
+class PortScanRule(DetectionRule):
+    def __init__(self):
+        super().__init__(
+            name="Port Scan Detection",
+            severity="Medium",
+            threshold=10,
+            window_seconds=60
+        )
+
+    def evaluate(self, events: List[NormalizedLog]) -> List[Alert]:
+        alerts = []
+        # In a real scenario, we'd need destination ports.
+        # For this mockup, we'll look for unique destination IPs or frequent hits from one source
+        ip_targets = {}
+        
+        now = datetime.utcnow()
+        cutoff = now - timedelta(seconds=self.window_seconds)
+
+        for event in events:
+            if event.timestamp > cutoff and event.source_ip:
+                if event.source_ip not in ip_targets:
+                    ip_targets[event.source_ip] = set()
+                # Mocking "destination ports" by looking at raw log hints or just event frequency
+                if "port" in (event.raw_log or "").lower():
+                    ip_targets[event.source_ip].add(event.raw_log) # Using raw_log as a proxy for unique port events
+        
+        for ip, unique_events in ip_targets.items():
+            if len(unique_events) >= self.threshold:
+                alerts.append(Alert(
+                    rule_name=self.name,
+                    severity=self.severity,
+                    description=f"Detected potential port scan from {ip} ({len(unique_events)} unique touches).",
+                    source_ip=ip,
+                    risk_score=40
+                ))
+        
+        return alerts
