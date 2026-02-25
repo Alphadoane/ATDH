@@ -63,10 +63,12 @@ class LiveCollector:
 
     def ingest_log(self, raw_log, log_type="auto"):
         try:
+            import socket
+            hostname = socket.gethostname()
             print(f"Ingesting: {raw_log[:100]}...")
             requests.post(
                 f"{BASE_URL}/ingest/raw", 
-                params={"raw_log": raw_log, "log_type": log_type},
+                params={"raw_log": raw_log, "log_type": log_type, "hostname": hostname},
                 timeout=5
             )
         except Exception as e:

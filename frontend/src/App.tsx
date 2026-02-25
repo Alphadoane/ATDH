@@ -41,10 +41,11 @@ ChartJS.register(
 interface Log {
     id: number;
     timestamp: string;
-    source_ip: string;
     event_type: string;
-    risk_score: number;
     raw_log: string;
+    hostname?: string;
+    risk_score: number;
+    source_ip?: string;
 }
 
 interface Alert {
@@ -58,6 +59,7 @@ interface Alert {
     mitre_technique?: string;
     mitre_id?: string;
     session_id?: number;
+    hostname?: string;
 }
 
 interface AttackSession {
@@ -67,37 +69,63 @@ interface AttackSession {
     start_time: string;
     last_seen: string;
     techniques: string;
-    is_active: bool;
+    is_active: boolean;
+}
+
+interface Asset {
+    id: number;
+    hostname: string;
+    ip_address: string;
+    mac_address?: string;
+    os_info?: string;
+    last_seen: string;
+    is_managed: boolean;
 }
 
 function App() {
     const [logs, setLogs] = useState<Log[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [sessions, setSessions] = useState<AttackSession[]>([]);
+    const [assets, setAssets] = useState<Asset[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isScanning, setIsScanning] = useState(false);
+
+    const fetchData = async () => {
+        try {
+            const [logsRes, alertsRes, sessionsRes, assetsRes] = await Promise.all([
+                axios.get('/api/logs'),
+                axios.get('/api/alerts'),
+                axios.get('/api/sessions'),
+                axios.get('/api/assets')
+            ]);
+            setLogs(logsRes.data);
+            setAlerts(alertsRes.data);
+            setSessions(sessionsRes.data);
+            setAssets(assetsRes.data);
+        } catch (err) {
+            console.error("Failed to fetch data", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [logsRes, alertsRes, sessionsRes] = await Promise.all([
-                    axios.get('/api/logs'),
-                    axios.get('/api/alerts'),
-                    axios.get('/api/sessions')
-                ]);
-                setLogs(logsRes.data);
-                setAlerts(alertsRes.data);
-                setSessions(sessionsRes.data);
-            } catch (err) {
-                console.error("Failed to fetch data", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchData();
         const interval = setInterval(fetchData, 5000);
         return () => clearInterval(interval);
     }, []);
+
+    const triggerScan = async () => {
+        setIsScanning(true);
+        try {
+            await axios.post('/api/scan');
+            setTimeout(fetchData, 3000);
+        } catch (err) {
+            alert("Scan failed");
+        } finally {
+            setTimeout(() => setIsScanning(false), 2000);
+        }
+    };
 
     const severityData = {
         labels: ['Low', 'Medium', 'High', 'Critical'],
@@ -270,20 +298,67 @@ function App() {
                 </div>
 
                 {/* Live Logs */}
-                <div className="space-y-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <Terminal className="w-5 h-5 text-cyber-accent" />
-                        Raw Event Stream
-                    </h2>
-                    <div className="glass-card flex flex-col h-[500px]">
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-white/10">
-                            {logs.map(log => (
-                                <div key={log.id} className="font-mono text-[11px] p-2 rounded bg-black/30 border border-white/5 hover:border-cyber-accent/30 transition-colors">
-                                    <span className="text-cyber-accent mr-2">[{format(new Date(log.timestamp), 'HH:mm:ss')}]</span>
-                                    <span className="text-cyber-success mr-2">{log.event_type}</span>
-                                    <span className="text-gray-400 truncate block mt-1">{log.raw_log.substring(0, 80)}...</span>
-                                </div>
-                            ))}
+                <div className="space-y-6">
+                    {/* Discovery Section */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-semibold flex items-center gap-2">
+                                <Database className="w-5 h-5 text-cyber-success" />
+                                Network Assets
+                            </h2>
+                            <button
+                                onClick={triggerScan}
+                                disabled={isScanning}
+                                className={`px-3 py-1 text-[10px] font-bold rounded border transition-all ${isScanning ? 'bg-gray-700 text-gray-500 border-gray-600' : 'bg-cyber-success/10 text-cyber-success border-cyber-success/30 hover:bg-cyber-success/20'}`}
+                            >
+                                {isScanning ? 'SCANNING...' : 'SCAN NETWORK'}
+                            </button>
+                        </div>
+                        <div className="glass-card overflow-hidden">
+                            <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+                                {assets.length === 0 && (
+                                    <div className="p-4 text-center text-gray-500 text-xs italic">No assets discovered yet. Run a scan.</div>
+                                )}
+                                {assets.map(asset => (
+                                    <div key={asset.id} className="p-3 border-b border-white/5 flex items-center justify-between hover:bg-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-1.5 rounded ${asset.is_managed ? 'bg-cyber-success/20' : 'bg-gray-400/10'}`}>
+                                                <User className={`w-3.5 h-3.5 ${asset.is_managed ? 'text-cyber-success' : 'text-gray-500'}`} />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-200">{asset.hostname}</p>
+                                                <p className="text-[10px] text-gray-500 font-mono">{asset.ip_address}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded ${asset.is_managed ? 'bg-cyber-success/10 text-cyber-success' : 'bg-white/5 text-gray-500'}`}>
+                                                {asset.is_managed ? 'AGENT ACTIVE' : 'UNMANAGED'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <Terminal className="w-5 h-5 text-cyber-accent" />
+                            Live Event Stream
+                        </h2>
+                        <div className="glass-card flex flex-col h-[500px]">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-white/10">
+                                {logs.map(log => (
+                                    <div key={log.id} className="font-mono text-[11px] p-2 rounded bg-black/30 border border-white/5 hover:border-cyber-accent/30 transition-colors">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-cyber-accent">[{format(new Date(log.timestamp), 'HH:mm:ss')}]</span>
+                                            <span className="text-[9px] text-gray-600 uppercase tracking-widest">{log.hostname || 'unknown-host'}</span>
+                                        </div>
+                                        <span className="text-cyber-success mr-2">{log.event_type}</span>
+                                        <span className="text-gray-400 truncate block mt-0.5">{log.raw_log.substring(0, 80)}...</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>

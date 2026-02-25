@@ -5,6 +5,7 @@ from sqlmodel import Field, SQLModel, create_engine, Session, select
 class NormalizedLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    hostname: Optional[str] = Field(default="localhost", index=True)
     source_ip: Optional[str] = None
     destination_ip: Optional[str] = None
     event_type: str
@@ -17,6 +18,7 @@ class NormalizedLog(SQLModel, table=True):
 class Alert(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    hostname: Optional[str] = Field(default="localhost", index=True)
     rule_name: str
     severity: str  # Low, Medium, High, Critical
     description: str
@@ -26,6 +28,15 @@ class Alert(SQLModel, table=True):
     mitre_technique: Optional[str] = None
     mitre_id: Optional[str] = None
     session_id: Optional[int] = Field(default=None, foreign_key="attacksession.id")
+
+class Asset(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    hostname: str = Field(unique=True, index=True)
+    ip_address: str = Field(index=True)
+    mac_address: Optional[str] = None
+    os_info: Optional[str] = None
+    last_seen: datetime = Field(default_factory=datetime.utcnow)
+    is_managed: bool = Field(default=False) # True if agent is installed
 
 class AttackSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

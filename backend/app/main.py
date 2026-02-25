@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from typing import List
 from .database import engine, create_db_and_tables, get_session
-from .models import NormalizedLog, Alert, AttackSession
+from .models import NormalizedLog, Alert, AttackSession, Asset
 from .engine.correlation_engine import CorrelationEngine
+from .engine.scanner import NetworkScanner
+import socket
 
 from .engine.normalizer import Normalizer
 from .engine.detection_engine import DetectionEngine
@@ -13,6 +15,7 @@ app = FastAPI(title="Adaptive Threat Detection Platform")
 normalizer = Normalizer()
 detection_engine = DetectionEngine()
 risk_scorer = RiskScorer()
+scanner = NetworkScanner()
 
 @app.on_event("startup")
 def on_startup():
@@ -34,13 +37,23 @@ def get_alerts(session: Session = Depends(get_session)):
 def get_sessions(session: Session = Depends(get_session)):
     return session.exec(select(AttackSession).order_by(AttackSession.last_seen.desc())).all()
 
+@app.get("/assets", response_model=List[Asset])
+def get_assets(session: Session = Depends(get_session)):
+    return session.exec(select(Asset).order_by(Asset.last_seen.desc())).all()
+
+@app.post("/scan")
+async def trigger_scan(background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
+    background_tasks.add_task(scanner.sync_assets, session)
+    return {"status": "Scan started in background"}
+
 @app.post("/ingest/raw")
-async def ingest_raw_log(raw_log: str, log_type: str = "auto", session: Session = Depends(get_session)):
+async def ingest_raw_log(raw_log: str, log_type: str = "auto", hostname: str = "localhost", session: Session = Depends(get_session)):
     # 1. Normalize
     normalized = normalizer.normalize(raw_log, log_type)
     if not normalized:
         raise HTTPException(status_code=400, detail="Failed to normalize log")
 
+    normalized.hostname = hostname
     # 2. Risk Scoring (Initial)
     normalized.risk_score = risk_scorer.calculate_risk(normalized)
     
@@ -56,7 +69,8 @@ async def ingest_raw_log(raw_log: str, log_type: str = "auto", session: Session 
     # 5. Correlation & MITRE
     correlation_engine = CorrelationEngine(session)
     for alert in new_alerts:
-        existing = session.exec(select(Alert).where(Alert.description == alert.description)).first()
+        alert.hostname = hostname
+        existing = session.exec(select(Alert).where(Alert.description == alert.description, Alert.hostname == hostname)).first()
         if not existing:
             correlation_engine.process_alert(alert)
     
