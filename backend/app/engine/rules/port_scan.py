@@ -9,7 +9,9 @@ class PortScanRule(DetectionRule):
             name="Port Scan Detection",
             severity="Medium",
             threshold=10,
-            window_seconds=60
+            window_seconds=60,
+            mitre_technique="Network Service Scanning",
+            mitre_id="T1046"
         )
 
     def evaluate(self, events: List[NormalizedLog]) -> List[Alert]:
@@ -36,7 +38,9 @@ class PortScanRule(DetectionRule):
                     severity=self.severity,
                     description=f"Detected potential port scan from {ip} ({len(unique_events)} unique touches).",
                     source_ip=ip,
-                    risk_score=40
+                    risk_score=40,
+                    mitre_technique=self.mitre_technique,
+                    mitre_id=self.mitre_id
                 ))
         
         return alerts

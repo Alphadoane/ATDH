@@ -9,7 +9,9 @@ class SSHBruteForceRule(DetectionRule):
             name="SSH Brute Force",
             severity="High",
             threshold=5,
-            window_seconds=120
+            window_seconds=120,
+            mitre_technique="Brute Force",
+            mitre_id="T1110"
         )
 
     def evaluate(self, events: List[NormalizedLog]) -> List[Alert]:
@@ -31,7 +33,9 @@ class SSHBruteForceRule(DetectionRule):
                     severity=self.severity,
                     description=f"Detected {count} failed login attempts from {ip} in {self.window_seconds}s.",
                     source_ip=ip,
-                    risk_score=70
+                    risk_score=70,
+                    mitre_technique=self.mitre_technique,
+                    mitre_id=self.mitre_id
                 ))
         
         return alerts

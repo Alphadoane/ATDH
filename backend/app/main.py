@@ -2,7 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from .database import engine, create_db_and_tables, get_session
-from .models import NormalizedLog, Alert
+from .models import NormalizedLog, Alert, AttackSession
+from .engine.correlation_engine import CorrelationEngine
 
 from .engine.normalizer import Normalizer
 from .engine.detection_engine import DetectionEngine
@@ -29,6 +30,10 @@ def get_logs(session: Session = Depends(get_session)):
 def get_alerts(session: Session = Depends(get_session)):
     return session.exec(select(Alert).order_by(Alert.timestamp.desc())).all()
 
+@app.get("/sessions", response_model=List[AttackSession])
+def get_sessions(session: Session = Depends(get_session)):
+    return session.exec(select(AttackSession).order_by(AttackSession.last_seen.desc())).all()
+
 @app.post("/ingest/raw")
 async def ingest_raw_log(raw_log: str, log_type: str = "auto", session: Session = Depends(get_session)):
     # 1. Normalize
@@ -45,16 +50,15 @@ async def ingest_raw_log(raw_log: str, log_type: str = "auto", session: Session 
     session.refresh(normalized)
 
     # 4. Detection Engine
-    # For simplicity, we check all recent logs or just the current one
-    # In a real system, this would be a sliding window query
     recent_logs = session.exec(select(NormalizedLog)).all()
     new_alerts = detection_engine.process_events(recent_logs)
     
+    # 5. Correlation & MITRE
+    correlation_engine = CorrelationEngine(session)
     for alert in new_alerts:
-        # Avoid duplicate alerts for the same event sequence (simplified logic)
         existing = session.exec(select(Alert).where(Alert.description == alert.description)).first()
         if not existing:
-            session.add(alert)
+            correlation_engine.process_alert(alert)
     
     session.commit()
     

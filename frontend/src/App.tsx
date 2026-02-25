@@ -55,22 +55,38 @@ interface Alert {
     description: string;
     source_ip: string;
     risk_score: number;
+    mitre_technique?: string;
+    mitre_id?: string;
+    session_id?: number;
+}
+
+interface AttackSession {
+    id: number;
+    source_ip: string;
+    risk_score: number;
+    start_time: string;
+    last_seen: string;
+    techniques: string;
+    is_active: bool;
 }
 
 function App() {
     const [logs, setLogs] = useState<Log[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [sessions, setSessions] = useState<AttackSession[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [logsRes, alertsRes] = await Promise.all([
+                const [logsRes, alertsRes, sessionsRes] = await Promise.all([
                     axios.get('/api/logs'),
-                    axios.get('/api/alerts')
+                    axios.get('/api/alerts'),
+                    axios.get('/api/sessions')
                 ]);
                 setLogs(logsRes.data);
                 setAlerts(alertsRes.data);
+                setSessions(sessionsRes.data);
             } catch (err) {
                 console.error("Failed to fetch data", err);
             } finally {
@@ -173,39 +189,83 @@ function App() {
             {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Alerts List */}
-                <div className="lg:col-span-2 space-y-4">
-                    <div className="flex justify-between items-center">
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Active Sessions */}
+                    <div className="space-y-4">
                         <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-cyber-warning" />
-                            Critical Alerts
+                            <Activity className={`w-5 h-5 text-cyber-accent`} />
+                            Active Attack Sessions (Correlated)
                         </h2>
-                    </div>
-                    <div className="space-y-3">
-                        {alerts.length === 0 && (
-                            <div className="glass-card p-8 text-center text-gray-500 italic">
-                                No alerts detected. Monitoring active...
-                            </div>
-                        )}
-                        {alerts.map(alert => (
-                            <div key={alert.id} className="glass-card p-4 border-l-4 border-l-cyber-danger flex items-start justify-between group hover:bg-white/5 transition-colors">
-                                <div className="flex gap-4">
-                                    <div className={`mt-1 p-1.5 rounded bg-cyber-danger/10`}>
-                                        <AlertTriangle className="w-4 h-4 text-cyber-danger" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-gray-200">{alert.rule_name}</h3>
-                                        <p className="text-sm text-gray-400 mt-1">{alert.description}</p>
-                                        <div className="flex gap-4 mt-3 text-[10px] font-mono text-gray-500">
-                                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {format(new Date(alert.timestamp), 'yyyy-MM-dd HH:mm:ss')}</span>
-                                            <span className="flex items-center gap-1"><Terminal className="w-3 h-3" /> IP: {alert.source_ip || 'N/A'}</span>
+                        <div className="grid grid-cols-1 gap-3">
+                            {sessions.length === 0 && (
+                                <div className="glass-card p-4 text-center text-gray-500 text-sm">No active multi-stage sessions.</div>
+                            )}
+                            {sessions.filter(s => s.is_active).map(session => (
+                                <div key={session.id} className="glass-card p-4 border-l-4 border-l-cyber-accent bg-cyber-accent/5">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-cyber-accent/10 rounded">
+                                                <Activity className="w-5 h-5 text-cyber-accent" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-gray-100">Intrusion Session: {session.source_ip}</h3>
+                                                <div className="flex gap-2 mt-1">
+                                                    {session.techniques.split(',').filter(t => t).map(t => (
+                                                        <span key={t} className="px-1.5 py-0.5 bg-cyber-accent/20 text-cyber-accent text-[9px] font-mono rounded border border-cyber-accent/30">{t}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] text-gray-500 uppercase">Cumul. Risk</p>
+                                            <p className="text-xl font-black text-cyber-accent">{session.risk_score}</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <span className="text-xs font-bold px-2 py-1 bg-cyber-danger/20 text-cyber-danger rounded">RISK: {alert.risk_score}</span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-cyber-warning" />
+                            Security Alerts
+                        </h2>
+                        <div className="space-y-3">
+                            {alerts.length === 0 && (
+                                <div className="glass-card p-8 text-center text-gray-500 italic">
+                                    No alerts detected. Monitoring active...
                                 </div>
-                            </div>
-                        ))}
+                            )}
+                            {alerts.map(alert => (
+                                <div key={alert.id} className="glass-card p-4 border-l-4 border-l-cyber-danger flex items-start justify-between group hover:bg-white/5 transition-colors">
+                                    <div className="flex gap-4">
+                                        <div className={`mt-1 p-1.5 rounded bg-cyber-danger/10`}>
+                                            <AlertTriangle className="w-4 h-4 text-cyber-danger" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-gray-200">{alert.rule_name}</h3>
+                                                {alert.mitre_id && (
+                                                    <span className="px-1.5 py-0.5 bg-white/5 text-gray-400 text-[9px] font-mono rounded border border-white/10 uppercase">{alert.mitre_id}</span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-400 mt-1">{alert.description}</p>
+                                            <div className="flex gap-4 mt-3 text-[10px] font-mono text-gray-500">
+                                                <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {format(new Date(alert.timestamp), 'yyyy-MM-dd HH:mm:ss')}</span>
+                                                <span className="flex items-center gap-1"><Terminal className="w-3 h-3" /> IP: {alert.source_ip || 'N/A'}</span>
+                                                {alert.mitre_technique && (
+                                                    <span className="flex items-center gap-1 text-cyber-accent/70"><Info className="w-3 h-3" /> {alert.mitre_technique}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-xs font-bold px-2 py-1 bg-cyber-danger/20 text-cyber-danger rounded">RISK: {alert.risk_score}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 

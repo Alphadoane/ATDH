@@ -23,6 +23,18 @@ class Alert(SQLModel, table=True):
     source_ip: Optional[str] = None
     status: str = "New" # New, In Progress, Resolved
     risk_score: int
+    mitre_technique: Optional[str] = None
+    mitre_id: Optional[str] = None
+    session_id: Optional[int] = Field(default=None, foreign_key="attacksession.id")
+
+class AttackSession(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source_ip: str = Field(index=True)
+    risk_score: int = 0
+    start_time: datetime = Field(default_factory=datetime.utcnow)
+    last_seen: datetime = Field(default_factory=datetime.utcnow)
+    techniques: str = "" # Comma-separated T-IDs
+    is_active: bool = True
 
 class DetectionRuleConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

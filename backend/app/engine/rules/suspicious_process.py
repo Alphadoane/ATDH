@@ -8,7 +8,9 @@ class SuspiciousProcessRule(DetectionRule):
             name="Suspicious Process Execution",
             severity="High",
             threshold=1,
-            window_seconds=0 # Immediate
+            window_seconds=0, # Immediate
+            mitre_technique="Command and Scripting Interpreter: PowerShell",
+            mitre_id="T1059.001"
         )
 
     def evaluate(self, events: List[NormalizedLog]) -> List[Alert]:
@@ -27,7 +29,9 @@ class SuspiciousProcessRule(DetectionRule):
                     severity=self.severity,
                     description=f"Suspicious process execution: {event.process_name} by {event.username}",
                     source_ip=event.source_ip,
-                    risk_score=80
+                    risk_score=80,
+                    mitre_technique=self.mitre_technique,
+                    mitre_id=self.mitre_id
                 ))
         
         return alerts
