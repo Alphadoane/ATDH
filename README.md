@@ -70,6 +70,18 @@ python simulate_attacks.py
 
 ---
 
+## ⚙️ Background Automation (Silent Mode)
+To ensure the platform starts automatically and silently when you log in:
+1.  Open **PowerShell as Administrator**.
+2.  Navigate to the project root: `cd d:\cyberSec`.
+3.  Run the registration script:
+    ```powershell
+    .\automation\register_startup.ps1
+    ```
+This will register two tasks in Windows Task Scheduler (`ATDH_Backend` and `ATDH_Collector`) that run hidden in the background atทุก logon. The collector will automatically have the "Highest Privileges" needed to read Security Logs.
+
+---
+
 ## 📊 Dashboard Usage
 - **Alert Feed**: Monitor the top section for glowing red cards indicating critical threats.
 - **Risk Trends**: Check the line graph to identify spikes in suspicious activity.
