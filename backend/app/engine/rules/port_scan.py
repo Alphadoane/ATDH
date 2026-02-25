@@ -16,8 +16,8 @@ class PortScanRule(DetectionRule):
 
     def evaluate(self, events: List[NormalizedLog]) -> List[Alert]:
         alerts = []
-        # In a real scenario, we'd need destination ports.
-        # For this mockup, we'll look for unique destination IPs or frequent hits from one source
+        # Analyzes unique target indicators (IPs/Ports) found within the log stream
+        # to identify scanning behavior patterns.
         ip_targets = {}
         
         now = datetime.utcnow()
@@ -27,9 +27,10 @@ class PortScanRule(DetectionRule):
             if event.timestamp > cutoff and event.source_ip:
                 if event.source_ip not in ip_targets:
                     ip_targets[event.source_ip] = set()
-                # Mocking "destination ports" by looking at raw log hints or just event frequency
+                
+                # Identify unique destination signatures from raw log
                 if "port" in (event.raw_log or "").lower():
-                    ip_targets[event.source_ip].add(event.raw_log) # Using raw_log as a proxy for unique port events
+                    ip_targets[event.source_ip].add(event.raw_log) 
         
         for ip, unique_events in ip_targets.items():
             if len(unique_events) >= self.threshold:

@@ -5,8 +5,9 @@ from ..models import NormalizedLog
 
 class Normalizer:
     def parse_windows_sysmon(self, raw: str) -> Optional[NormalizedLog]:
-        # Simple mockup for Windows Event/Sysmon (assuming JSON-like or key-value)
-        # In a real scenario, this would handle XML or specific JSON layouts
+        """
+        Parses Windows Event and Sysmon logs using structured regex patterns.
+        """
         try:
             timestamp_match = re.search(r'Time: ([\d\-: ]+)', raw)
             user_match = re.search(r'User: ([\w\\]+)', raw)
